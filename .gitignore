@@ -218,3 +218,31 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# AIGate: captures and datasets
+data/raw/*
+!data/raw/.gitkeep
+data/processed/*
+!data/processed/.gitkeep
+data/external/*
+!data/external/.gitkeep
+data/interim/*
+!data/interim/.gitkeep
+data/manifests/*
+!data/manifests/.gitkeep
+
+# Generated models and runtime artifacts
+models/*
+!models/.gitkeep
+*.pcap
+*.pcapng
+*.log
+.env
+.env.*
+!.env.example
+
+# Agent context
+context/*
+
+# Markdown viewer
+index.html
