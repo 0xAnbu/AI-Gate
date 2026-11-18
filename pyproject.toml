@@ -29,6 +29,9 @@ dev = [
 where = ["src"]
 include = ["aigate*"]
 
+[tool.setuptools.package-data]
+"aigate.capture" = ["*.json"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]

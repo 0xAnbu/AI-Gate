@@ -32,10 +32,10 @@ jobs:
           python -m pip install -e .
 
       - name: Lint
-        run: ruff check src tests
+        run: ruff check src tests scripts fixtures
 
       - name: Check formatting
-        run: ruff format --check src tests
+        run: ruff format --check src tests scripts fixtures
 
       - name: Test
         run: python -m pytest

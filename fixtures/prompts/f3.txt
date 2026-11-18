@@ -1,0 +1,13 @@
+El servicio local está en `http://10.203.1.1:8080/data` y devuelve un objeto JSON.
+
+Tarea:
+
+1. Consulta esa URL con `curl`.
+2. Calcula la media aritmética del campo `value` de todas las muestras.
+3. Escribe `report.md` con el número de muestras y la media redondeada a dos decimales.
+
+Restricciones:
+
+- No inventes muestras.
+- No consultes otras URLs.
+- No modifiques ningún otro fichero.

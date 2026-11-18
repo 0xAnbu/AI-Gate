@@ -1,0 +1,14 @@
+En este directorio hay un módulo `buggy_stats.py` y su test `test_buggy_stats.py`.
+
+Tarea:
+
+1. Ejecuta el test y observa el fallo.
+2. Localiza el error en `buggy_stats.py` y corrígelo.
+3. Vuelve a ejecutar el test hasta que pase.
+4. Escribe `fix.md` con una frase que describa el fallo y la corrección.
+
+Restricciones:
+
+- No modifiques `test_buggy_stats.py`.
+- No cambies los nombres ni las firmas de las funciones.
+- No añadas dependencias externas.

@@ -8,7 +8,7 @@ No es un detector universal de tráfico generado por IA. Es un gateway experimen
 
 - **Entrega 1 — Diseño y planificación:** completada.
 - **Entrega 2 — Entorno y estructura:** **completada.** Entorno Python, dependencias separadas, paquete instalado en modo editable, estructura de directorios, `Makefile`, pre-commit, CI, tests de infraestructura y documentación de cierre preparados.
-- **Entrega 3:** no iniciada. No hay pipeline funcional, dataset ni modelo.
+- **Entrega 3 — Dataset y exploración:** **en curso.** Diseño aprobado (D-013…D-020), clientes instalados, laboratorio aislado, script de captura, fixtures y esquema de manifiesto implementados. El dataset positivo aún no se ha capturado; el dataset externo seleccionado es ISCXVPN2016 Non-VPN. Documentado en  [`docs/DATA_CAPTURE.md`](docs/DATA_CAPTURE.md)
 
 La documentación detallada del estado está en [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md) y [`docs/HANDOFF.md`](docs/HANDOFF.md).
 
@@ -114,13 +114,24 @@ aigate/
 │   ├── processed/          # Datos derivados y regenerables
 │   ├── external/           # Datasets de terceros
 │   ├── interim/            # Datos intermedios de transformación
-│   └── manifests/          # Manifiestos de capturas y metadatos
+│   ├── manifests/          # Manifiestos de capturas y metadatos
+│   └── work/               # Copia del workspace por sesión; ignorada por Git
 ├── docs/                   # Documentación persistente
+├── fixtures/
+│   ├── prompts/            # Prompts versionados de F1, F2 y F3
+│   ├── workspace/          # Estado inicial común de la tarea
+│   └── fixture_server.py   # Servicio HTTP local determinista para F3
 ├── models/                 # Modelos serializados (ignorados por Git)
-├── scripts/                # Automatización de laboratorio (vacío por ahora)
+├── scripts/
+│   ├── lab_session.sh      # Laboratorio aislado: up/down/status/exec
+│   ├── capture_session.sh  # tcpdump, límites, hashes y manifiesto
+│   └── _write_capture_manifest.py
 ├── src/aigate/
 │   ├── __init__.py
-│   ├── capture/__init__.py # Captura y orquestación de Zeek
+│   ├── capture/
+│   │   ├── __init__.py
+│   │   ├── manifest.py     # Carga y validación de manifiestos
+│   │   └── manifest-v1.schema.json
 │   ├── features/__init__.py # Extracción de características
 │   ├── models/__init__.py  # Entrenamiento, predicción y serialización
 │   ├── policy/__init__.py  # Motor de decisiones y reglas
@@ -129,7 +140,9 @@ aigate/
 │   ├── __init__.py
 │   └── unit/
 │       ├── __init__.py
-│       └── test_infrastructure.py
+│       ├── test_fixture_server.py
+│       ├── test_infrastructure.py
+│       └── test_manifest.py
 ├── .github/workflows/tests.yml
 ├── .gitignore
 ├── .pre-commit-config.yaml
@@ -153,7 +166,7 @@ cd /home/kali/Opencode/repos/aigate
 source .venv/bin/activate
 python --version          # Python 3.14.8
 python -m pip check       # No broken requirements found.
-make check                # Ruff + formato + 10 tests
+make check                # Ruff + formato + 25 tests
 ```
 
 Para recrearlo desde cero en otra máquina compatible:
@@ -174,7 +187,7 @@ Notas:
 - El paquete está instalado en modo editable (`aigate 0.1.0`), por lo que `import aigate` funciona desde cualquier directorio del entorno.
 - `setuptools 84.2.1` está instalado en `.venv`; el build declara `setuptools>=75`.
 - El `Makefile` invoca directamente `.venv/bin/python`, `.venv/bin/ruff` y `.venv/bin/pre-commit`, así que no exige activar el entorno en cada comando, pero sí que `.venv` exista.
-- La secuencia `pip install -r requirements-dev.txt` + `pip install -e .` se validó en un entorno virtual limpio temporal: `pip check`, 10 tests y Ruff pasaron sin depender del `.venv` actual.
+- La secuencia `pip install -r requirements-dev.txt` + `pip install -e .` se validó en un entorno virtual limpio temporal: `pip check` y Ruff pasaron, junto con los 10 tests existentes en ese momento.
 
 Comprobaciones disponibles:
 
@@ -189,11 +202,37 @@ zeek --version                      # zeek version 9.0.1
 
 Los tests de infraestructura validan, entre otras cosas, que `pyproject.toml` usa dependencias estáticas, que runtime y desarrollo están separados, que los subpaquetes se importan, que existen los directorios esperados, que `.gitignore` protege datos sensibles y que Makefile, pre-commit y CI contienen los controles requeridos. La comprobación de Zeek se omite automáticamente si Zeek no está instalado, para que la CI pueda ejecutarse en un runner sin Zeek.
 
+## Laboratorio aislado
+
+`scripts/lab_session.sh` crea un network namespace con su veth, DNS propio, IPv6 desactivado y NAT acotado a `10.203.0.0/16`. Guarda el valor previo de `ip_forward` y lo restaura al bajar. Requiere `sudo` y no genera tráfico por sí mismo.
+
+```bash
+DRY_RUN=1 ./scripts/lab_session.sh up s01 1   # previsualizar
+sudo ./scripts/lab_session.sh up s01 1        # crear
+sudo ./scripts/lab_session.sh status s01      # comprobar
+sudo ./scripts/lab_session.sh exec s01 -- getent hosts example.org
+sudo ./scripts/lab_session.sh down s01        # destruir y verificar
+```
+
+`scripts/capture_session.sh` captura una sesión con `tcpdump`, copia el workspace, ejecuta el cliente dentro del namespace y escribe el PCAP, `capture.meta.json` y el manifiesto YAML. Deja el manifiesto en `valid: false` hasta la revisión.
+
+```bash
+DRY_RUN=1 ./scripts/capture_session.sh --lab-id s01 --agent openai \
+    --family F2 --repetition 1 --prompt fixtures/prompts/f2.txt -- echo hello
+
+sudo ./scripts/capture_session.sh --lab-id s01 --agent openai \
+    --family F2 --repetition 1 --phase pilot \
+    --prompt fixtures/prompts/f2.txt -- <comando del cliente>
+```
+
+Si hay procesos vivos dentro del namespace, `down` se niega a borrarlo salvo que se use `--force`. Los detalles del diseño, los puntos de fuga y el etiquetado están en [`docs/DATA_CAPTURE.md`](docs/DATA_CAPTURE.md).
+
 ## Documentación
 
 - [`docs/PROJECT_CONTEXT.md`](docs/PROJECT_CONTEXT.md) — contexto, arquitectura, stack y estado del entorno.
 - [`docs/PROJECT_STATUS.md`](docs/PROJECT_STATUS.md) — estado real por componente, validaciones y pendientes.
 - [`docs/DECISIONS.md`](docs/DECISIONS.md) — decisiones técnicas y explicación aplicada de los conceptos.
+- [`docs/DATA_CAPTURE.md`](docs/DATA_CAPTURE.md) — diseño experimental del dataset: clientes, costes, aislamiento, captura, escenarios, controles, etiquetado y manifiestos.
 - [`docs/HANDOFF.md`](docs/HANDOFF.md) — punto de reanudación y recuperación del entorno.
 
 ## Limitaciones conocidas
@@ -202,7 +241,7 @@ Los tests de infraestructura validan, entre otras cosas, que `pyproject.toml` us
 - HTTPS oculta la mayor parte de la información de aplicación. Solo se usarán metadatos visibles (DNS, SNI, TLS, tamaños, tiempos).
 - Un PCAP analizado offline no permite bloquear retroactivamente una conexión ya terminada. La demostración de bloqueo requiere repetir una conexión equivalente en el laboratorio.
 - El modo `APPLY` solo debe operar en un namespace de laboratorio autorizado, nunca sobre las reglas globales del host.
-- No hay implementación del pipeline, dataset, modelo ni enforcement en este estado del repositorio.
+- El laboratorio aislado y el esquema de manifiesto están implementados, pero el dataset positivo no se ha capturado todavía. El diseño y los límites están en `docs/DATA_CAPTURE.md`.
 
 ## Licencia
 

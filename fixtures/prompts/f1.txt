@@ -1,0 +1,8 @@
+Lee el fichero `input.txt` de este directorio y escribe `summary.md` con un resumen en exactamente cinco viñetas.
+
+Requisitos:
+
+- Usa solo información que aparezca en `input.txt`.
+- No inventes cifras, nombres ni conclusiones.
+- No modifiques `input.txt`.
+- Escribe el resumen en español.

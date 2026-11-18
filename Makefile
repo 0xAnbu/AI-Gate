@@ -12,13 +12,13 @@ install-dev:
 	$(PYTHON) -m pip install -e .
 
 lint:
-	$(RUFF) check src tests
+	$(RUFF) check src tests scripts fixtures
 
 format:
-	$(RUFF) format src tests
+	$(RUFF) format src tests scripts fixtures
 
 format-check:
-	$(RUFF) format --check src tests
+	$(RUFF) format --check src tests scripts fixtures
 
 test:
 	$(PYTHON) -m pytest

@@ -365,6 +365,4 @@ Salida esperada:
 
 ## Lo que queda fuera de este documento
 
-- **Punto 9 — commit:** lo ejecuta el usuario. El hook de pre-commit se disparará automáticamente en ese momento.
-- **Ejecución remota de la CI:** requiere `push` de la rama.
-- **Entrega 3:** no iniciada.
+- **Entrega 3:** fuera del ámbito de este documento; su estado y diseño están en `docs/DATA_CAPTURE.md` y `docs/PROJECT_STATUS.md`.
