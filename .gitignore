@@ -230,6 +230,8 @@ data/interim/*
 !data/interim/.gitkeep
 data/manifests/*
 !data/manifests/.gitkeep
+data/work/*
+!data/work/.gitkeep
 
 # Generated models and runtime artifacts
 models/*

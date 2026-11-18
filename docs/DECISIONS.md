@@ -2,7 +2,7 @@
 
 > Registro de decisiones técnicas y de sus consecuencias. Cada entrada explica el concepto aplicado al proyecto, no teoría genérica.
 >
-> Última actualización: 2026-11-15
+> Última actualización: 2026-11-18
 
 ---
 
@@ -318,14 +318,179 @@ Esta separación permite auditar el origen de cada dato y evita que un dataset e
 
 ---
 
+## D-013 — Codex CLI, Claude Code y OpenCode como clientes de los tres proveedores
+
+**Estado:** aceptada.
+
+**Decisión:** usar Codex CLI (OpenAI), Claude Code (Anthropic) y OpenCode con API de DeepSeek como clientes de agente. El usuario confirma que los tres pueden usarse sin límites para este proyecto.
+
+**Contexto:** los tres clientes están instalados y verificados: Codex CLI `0.170.0` reporta el modelo `gpt-6.2-sol`; Claude Code `2.1.327` reporta `Claude Opus 5.5 (claude-opus-5-5)`; OpenCode `2.1.4` se conecta a DeepSeek con `deepseek-flash` (`DeepSeek-V4.1-Flash-1017`).
+
+**Justificación:** son los clientes oficiales o documentados por cada proveedor, tienen modo no interactivo y no requieren Node.js. Usar la API directa mediría un cliente escrito por nosotros, no un agente real.
+
+**Consecuencias:**
+
+- El modelo por defecto puede cambiar sin cambiar la versión del cliente. Cada sesión registra `model_requested` y `model_reported`; no se promete estabilidad entre fechas.
+- La confirmación de uso sin límites es del usuario, no una garantía contractual del proveedor. Si cambia, se aplica el plan de repliegue.
+- No se usan cuentas nuevas, pruebas encubiertas ni credenciales compartidas.
+
+**Concepto aplicado:** un agente es la combinación de proveedor, cliente, modelo y plan. Atribuir un comportamiento de red solo al proveedor confunde cuatro variables en una.
+
+---
+
+## D-014 — Un network namespace y un veth por sesión, con captura en el extremo host
+
+**Estado:** aceptada.
+
+**Decisión:** aislar cada sesión en un namespace propio conectado al host por un veth, capturar con tcpdump en el extremo host, con snaplen completo y sin filtro BPF.
+
+**Contexto:** sin aislamiento, el tráfico de tres agentes y del host se mezcla y la etiqueta de sesión deja de ser verificable. El piloto confirmó que la topología funciona: 32 paquetes capturados en `veth-h-s01` y `401` de `api.deepseek.com` sin credenciales.
+
+**Justificación:** el extremo host del veth es el único punto por el que pasa todo el tráfico del namespace. Capturar ahí evita duplicar paquetes, ve direcciones pre-NAT y no añade procesos dentro del entorno medido.
+
+**Consecuencias:**
+
+- Los nombres de interfaz están limitados a 15 caracteres: `lab_id` es de 1–8 caracteres alfanuméricos.
+- Se requiere root y hay una sola sesión activa a la vez, porque la tabla nftables es global.
+- El estado se guarda en `/run/aigate-lab/<lab_id>.env` para restaurar `ip_forward` con su valor previo, no con un `0` supuesto.
+- No se captura loopback del namespace, sockets Unix ni el interior de TLS.
+
+**Concepto aplicado:** un namespace de red es una pila completa (interfaces, rutas, ARP, sockets), no un filtro. El veth es el cable virtual que la conecta al host; el punto de captura determina qué se puede afirmar después.
+
+---
+
+## D-015 — DNS público por namespace e IPv6 desactivado solo dentro del namespace
+
+**Estado:** aceptada.
+
+**Decisión:** escribir `nameserver 1.1.1.1` en `/etc/netns/<ns>/resolv.conf` y desactivar IPv6 con `sysctl` dentro del namespace, sin tocar el host.
+
+**Contexto:** una caché DNS del host oculta consultas y una ruta IPv6 no NATeada rompe la reproducibilidad. El piloto verificó ambos valores dentro del namespace.
+
+**Justificación:** el DNS clásico queda visible en el PCAP y en `dns.log`; desactivar IPv6 elimina una ruta que no está cubierta por la captura ni por el NAT IPv4.
+
+**Consecuencias:**
+
+- El dataset representa IPv4. Es una desviación declarada respecto a una red doméstica real.
+- Si un cliente usa DoH, la consulta DNS no aparecerá; se detecta por destino/SNI y se etiqueta.
+- El host conserva su configuración IPv6 intacta.
+
+**Concepto aplicado:** el aislamiento debe ser verificable, no implícito. Un `sysctl` dentro del namespace cambia solo esa pila; el mismo comando en el host cambiaría todo el sistema.
+
+---
+
+## D-016 — 27 sesiones positivas, 7 controles negativos y etiqueta `CLIENT_RUNTIME_IDLE`
+
+**Estado:** aceptada.
+
+**Decisión:** mantener el diseño 3 familias × 3 agentes × 3 repeticiones = 27 sesiones, más 7 controles negativos. Añadir una etiqueta de sesión propia para el control N-06: `CLIENT_RUNTIME_IDLE`.
+
+**Contexto:** el control N-06 mide el tráfico de un cliente instalado pero sin prompt (heartbeat, telemetría, comprobación de actualización). Mezclarlo con `NON_AGENT_REFERENCE_SESSION` impide tratarlo de forma independiente en el motor de políticas.
+
+**Justificación:** el usuario quiere poder bloquear ese tráfico por separado o habilitarlo de forma explícita. Una etiqueta propia permite una regla `ALLOW`/`BLOCK` diferenciada sin reclasificar las otras referencias.
+
+**Consecuencias:**
+
+- `CLIENT_RUNTIME_IDLE` es una etiqueta de sesión; la taxonomía canónica de cinco clases del prompt maestro se mantiene para los informes, con un mapeo documentado.
+- El motor de políticas puede tratar `CLIENT_RUNTIME_IDLE` como clase bloqueable independiente.
+- Cualquier reducción de las 27 sesiones requiere aprobación y se registra como limitación.
+
+**Concepto aplicado:** separar «estar instalado» de «ejecutar una tarea» evita que un clasificador aprenda la firma de la telemetría y la llame detección de agente.
+
+---
+
+## D-017 — Etiquetado de sesión y de procedencia de flujo, incluido MCP iniciado por el agente
+
+**Estado:** aceptada.
+
+**Decisión:** etiquetar la sesión por diseño experimental y cada flujo por reglas de destino versionadas. El tráfico MCP iniciado por el agente se etiqueta como `AGENT_TOOL_MCP` y cuenta como tráfico asociado al agente.
+
+**Contexto:** durante la captura no hay tráfico humano. Si el agente inicia un servidor MCP o una herramienta externa, ese flujo forma parte de la sesión aunque no vaya al proveedor.
+
+**Justificación:** ignorarlo produciría falsos `UNKNOWN_IN_SESSION` y perdería justamente el tráfico de herramientas que el proyecto quiere estudiar. Etiquetarlo como `AGENT_TOOL_MCP` lo distingue del tráfico al modelo sin confundirlos.
+
+**Consecuencias:**
+
+- Sigue sin haber atribución por paquete: el flujo se asocia a la sesión, no al modelo.
+- Un flujo MCP a un tercero puede contener datos que no controlamos; se documenta y no se publica.
+- Las reglas de destino se congelan por versión (`labelling_rules_version`); un host nuevo no se reclasifica retroactivamente.
+
+**Concepto aplicado:** la procedencia es una afirmación sobre quién inició el flujo y hacia dónde, no sobre qué modelo generó cada byte.
+
+---
+
+## D-018 — Manifiesto YAML v1 validado con JSON Schema
+
+**Estado:** aceptada.
+
+**Decisión:** definir `manifest-v1.schema.json` y validar cada manifiesto con `jsonschema` (Draft 2020-12) y PyYAML. La validación se ejecuta en tests y antes de aceptar una sesión.
+
+**Contexto:** `jsonschema` ya estaba presente como dependencia transitiva fijada (`4.26.0`) en `requirements.txt`; no se añade ningún paquete nuevo. La alternativa era un validador manual con comprobaciones dispersas.
+
+**Justificación:** un esquema declarativo es reutilizable por CI y por herramientas externas, produce errores precisos y evita que el validador se desvíe del documento. El coste diferencial es cero porque la dependencia ya está instalada.
+
+**Consecuencias:**
+
+- `additionalProperties: false` obliga a versionar el esquema si se añaden campos.
+- El esquema vive en `src/aigate/capture/manifest-v1.schema.json` y se empaqueta con el paquete.
+- Un manifiesto puede ser válido para el esquema y seguir siendo un experimento inválido (`valid: false`); son dos conceptos distintos.
+
+**Concepto aplicado:** validar la forma no valida el contenido científico. El esquema garantiza que el manifiesto es parseable y completo; la validez experimental la decide la lista de comprobaciones.
+
+---
+
+## D-019 — ISCXVPN2016 (Non-VPN) como dataset externo de referencia
+
+**Estado:** aceptada. Sustituye a la propuesta P-09, que queda rechazada.
+
+**Decisión:** usar **ISCXVPN2016 (VPN-nonVPN, UNB/CIC)** como dataset externo principal, inicialmente solo el subconjunto **Non-VPN**. No se usa como dato de entrenamiento del clasificador de agentes.
+
+**Contexto:** el dataset contiene 28 GB de tráfico etiquetado por tipo de aplicación (navegación, correo, chat, streaming, transferencia de ficheros, VoIP y P2P), en formato PCAP y CSV, capturado con Wireshark y tcpdump. Se publica para investigación y requiere citar a Gil et al. (ICISSP 2016).
+
+**Justificación:** aporta tráfico de aplicaciones reales no asociado a agentes, útil como referencia externa de «no agente» y para probar la generalización del pipeline fuera de nuestro laboratorio. Es más pertinente que CIC-IDS2017 (cuyo benigno es sintético) y que MAWI (decenas de GB sin etiquetas).
+
+**Consecuencias:**
+
+- **No comparte la etiqueta objetivo**: no contiene sesiones de agentes de IA. Se usa como referencia/negativo externo y para análisis de dominio, nunca como positivo.
+- La descarga exige un formulario con datos personales (nombre, correo, organización, país). **No se automatiza ni se rellena por el usuario**: la solicitud la hace el usuario.
+- El total son 28 GB; el subconjunto Non-VPN sigue siendo grande. Se procesará una muestra estratificada y acotada, con selección documentada y hash, no el corpus completo.
+- El tráfico fue generado en laboratorio con cuentas Alice/Bob y tareas guionizadas; no es una línea base de usuarios reales.
+- Se guarda en `data/external/`, nunca se mezcla con `data/raw/` ni se publica.
+
+**Concepto aplicado:** un dataset externo solo aporta valor si su distribución y su etiqueta son compatibles con la pregunta. Aquí aporta contraste de aplicaciones, no etiquetas de agente; presentarlo como otra cosa sería contaminación.
+
+---
+
+## D-020 — PCAP privado y publicación limitada a agregados y manifiestos saneados
+
+**Estado:** aceptada.
+
+**Decisión:** los PCAP y los logs Zeek crudos permanecen en el equipo y nunca se publican. Solo se publican esquema, manifiestos saneados y estadísticas agregadas.
+
+**Contexto:** un PCAP contiene direcciones IP, consultas DNS, SNI, certificados y metadatos de temporización. Aunque TLS cifre el contenido, esos metadatos pueden ser sensibles.
+
+**Justificación:** el valor del proyecto está en el método y en las features, no en exponer tráfico de terceros o credenciales. La reproducibilidad se apoya en el manifiesto y en los scripts, no en publicar la captura.
+
+**Consecuencias:**
+
+- `data/raw/`, `data/processed/`, `data/manifests/` y `data/work/` están ignorados por Git.
+- Los manifiestos se revisan antes de compartirse: sin rutas absolutas, correos ni tokens.
+- Los prompts se guardan como hash; el texto vive en `fixtures/` solo si es propio.
+- `capture.meta.json` guarda el hash del comando, no su texto: un comando puede contener por error una ruta con nombre de usuario o una credencial.
+
+**Concepto aplicado:** minimización de datos. Se publica lo necesario para verificar el método, no lo necesario para reconstruir la vida de los sujetos capturados.
+
+---
+
 ## Decisiones pendientes
 
 Estas decisiones **no** se han tomado en esta entrega y requieren revisión o aprobación:
 
-3. **Manifiestos:** definir el esquema exacto de `data/manifests/` en la Entrega 3.
-4. **Artefactos:** decidir si se añaden patrones para `*.joblib`, `*.pkl`, `reports/` y `artifacts/` cuando existan esas rutas.
-5. **Lockfile:** valorar hashes de integridad si el proyecto crece; no es necesario para el MVP actual.
-6. **Producto:** implementar captura, features, modelo, políticas y enforcement en las siguientes entregas.
+3. **Artefactos:** decidir si se añaden patrones para `*.joblib`, `*.pkl`, `reports/` y `artifacts/` cuando existan esas rutas.
+4. **Lockfile:** valorar hashes de integridad si el proyecto crece; no es necesario para el MVP actual.
+5. **Producto:** implementar captura, features, modelo, políticas y enforcement en las siguientes entregas.
+6. **ISCXVPN2016:** el usuario debe completar el formulario de descarga y confirmar el subconjunto Non-VPN elegido antes de procesarlo.
+7. **Piloto:** ejecutar las tres sesiones de humo y revisar los hosts reales antes de las 24 sesiones restantes.
 
 ---
 
@@ -345,3 +510,11 @@ Estas decisiones **no** se han tomado en esta entrega y requieren revisión o ap
 | D-010 | Documentación persistente y cierre honesto del estado. |
 | D-011 | Makefile como interfaz única de tareas de desarrollo. |
 | D-012 | Tests de infraestructura para verificar el esqueleto del repositorio. |
+| D-013 | Codex CLI, Claude Code y OpenCode/DeepSeek como clientes; uso confirmado por el usuario. |
+| D-014 | Un netns + veth por sesión y captura en el extremo host, snaplen completo y sin BPF. |
+| D-015 | DNS público por namespace e IPv6 desactivado solo dentro del namespace. |
+| D-016 | 27 sesiones positivas, 7 controles negativos y etiqueta `CLIENT_RUNTIME_IDLE` para el cliente inactivo. |
+| D-017 | Etiquetado de sesión y procedencia de flujo; MCP iniciado por el agente es `AGENT_TOOL_MCP`. |
+| D-018 | Manifiesto YAML v1 validado con JSON Schema y `jsonschema`. |
+| D-019 | ISCXVPN2016 (Non-VPN) como dataset externo de referencia; P-09 rechazada. |
+| D-020 | PCAP privado; publicación limitada a agregados y manifiestos saneados. |

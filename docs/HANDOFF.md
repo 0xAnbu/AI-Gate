@@ -2,245 +2,241 @@
 
 > Punto exacto de reanudación. Este documento debe bastar para continuar sin depender del historial de la conversación.
 >
-> Última actualización: 2026-11-15
+> Última actualización: 2026-11-18
 
 ---
 
 ## ENTREGA ACTUAL
 
-**Entrega 2 — Preparación del entorno y estructura del proyecto.**
+**Entrega 3 — Dataset y exploración de datos.**
 
-Rama de trabajo: `entrega-2-entorno-y-estructura`.
-Commit base: `6da72e5 Initial commit`.
+Sub-entrega **3.1 (investigación y diseño): aprobada.**
+Sub-entrega **3.2 (laboratorio y piloto): en curso.**
+
+Rama de trabajo: `entrega-3-recogida-de-datos`.
+Commit base: `3ae9f4f Merge PR: entrega-2-entorno-y-estructura`.
+Estado del árbol: cambios de 3.1/3.2 sin commitear.
 
 ## ESTADO
 
-**Completada técnicamente.** El entorno, las dependencias, el paquete editable, la estructura, el Makefile, pre-commit, la CI, los tests de infraestructura y la documentación están preparados y validados localmente.
+**Infraestructura lista, datos no.**
 
-Queda un único paso: el commit humano. La CI está configurada pero no se ha ejecutado en GitHub porque no hay push.
+Existe:
 
-No hay pipeline, dataset, modelo, motor de políticas, enforcement ni dashboard implementados.
+- Diseño experimental aprobado en `docs/DATA_CAPTURE.md`.
+- Decisiones D-013…D-020 en `docs/DECISIONS.md`.
+- Tres clientes instalados: Codex `0.170.0`, Claude Code `2.1.327`, OpenCode `2.1.4`.
+- `scripts/lab_session.sh` con `up`, `down`, `status`, `exec`, `DRY_RUN` y rollback.
+- `scripts/capture_session.sh` con tcpdump, límites, hashes, `capture.meta.json` y manifiesto.
+- `fixtures/prompts/{f1,f2,f3}.txt`, `fixtures/workspace/` y `fixtures/fixture_server.py`.
+- Esquema de manifiesto v1 y validador con 12 tests; 3 tests del servidor local.
+- Piloto de conectividad: 32 paquetes, `401` de DeepSeek, limpieza verificada.
 
-## FUNCIONALIDADES COMPLETADAS
+No existe:
 
-- Entorno virtual `.venv` con Python 3.14.8 aislado del Python del sistema.
-- Dependencias de ejecución y desarrollo separadas.
-- `setuptools 84.2.1` instalado en `.venv`.
-- Paquete `aigate 0.1.0` instalado en modo editable.
-- `pyproject.toml` con dependencias estáticas, extras de desarrollo, `packages.find`, pytest y Ruff.
-- Estructura de directorios completa, incluidos `data/interim/` y `data/manifests/`.
-- Subpaquetes `capture`, `features`, `models`, `policy` y `enforcement` importables mediante `__init__.py` con docstring.
-- `Makefile` con objetivos `install`, `install-dev`, `lint`, `format`, `format-check`, `test`, `check`, `pre-commit-install`, `pre-commit` y `clean`.
-- `.pre-commit-config.yaml` con Ruff, Ruff format, validación YAML/JSON/TOML, fin de archivo, espacios, detección de claves privadas, tamaño máximo y pytest.
-- Hook de pre-commit instalado en `.git/hooks/pre-commit`.
-- CI en `.github/workflows/tests.yml` para lint, formato y tests.
-- 10 tests de infraestructura en `tests/unit/test_infrastructure.py`.
-- Documentación persistente actualizada.
-- Rama `entrega-2-entorno-y-estructura` creada.
+- Ninguna captura de sesión experimental (solo el PCAP de humo en `/tmp`).
+- Ningún manifiesto rellenado.
+- Ningún log Zeek de sesión real.
+- Ningún control negativo ejecutado.
+- Ningún dataset externo descargado.
+- `DATASET_CARD.md`.
+
+## HECHO
+
+### 3.1 — Diseño
+
+1. Comparativa de Codex CLI, Claude Code y OpenCode/DeepSeek con fuentes oficiales.
+2. Análisis económico, de autenticación, credenciales y 12 puntos de fuga.
+3. Arquitectura netns + veth + tcpdump + Zeek + nftables, con limpieza y rollback.
+4. 27 sesiones positivas (3×3×3), 7 controles negativos.
+5. Etiquetado de sesión y procedencia de flujo, sin atribución por paquete.
+6. Esquema de manifiesto v1 y evaluación de datasets externos.
+7. Viabilidad temporal y plan de repliegue.
+8. `docs/DATA_CAPTURE.md`, actualización de documentación persistente.
+9. Registro de D-013…D-020.
+
+### 3.2 — Laboratorio
+
+1. Instalación y verificación de los tres clientes.
+2. Implementación de `scripts/lab_session.sh`.
+3. Implementación de `src/aigate/capture/manifest.py` y `manifest-v1.schema.json`.
+4. Implementación de `scripts/capture_session.sh` y `_write_capture_manifest.py`.
+5. Fixtures: prompts F1–F3, workspace inicial y servidor local con tests.
+6. 12 tests de manifiesto + 3 tests del fixture (25 en total).
+7. Piloto de conectividad ejecutado por el usuario y verificado.
 
 ## ARCHIVOS CREADOS
 
-- `docs/PROJECT_CONTEXT.md`
-- `docs/PROJECT_STATUS.md`
-- `docs/DECISIONS.md`
-- `docs/HANDOFF.md`
-- `Makefile`
-- `.pre-commit-config.yaml`
-- `.github/workflows/tests.yml`
-- `requirements-dev.txt`
-- `src/aigate/capture/__init__.py`
-- `src/aigate/features/__init__.py`
-- `src/aigate/models/__init__.py`
-- `src/aigate/policy/__init__.py`
-- `src/aigate/enforcement/__init__.py`
-- `tests/unit/__init__.py`
-- `tests/unit/test_infrastructure.py`
-- `data/interim/.gitkeep`
-- `data/manifests/.gitkeep`
+- `docs/DATA_CAPTURE.md`
+- `scripts/lab_session.sh`
+- `scripts/capture_session.sh`
+- `scripts/_write_capture_manifest.py`
+- `src/aigate/capture/manifest.py`
+- `src/aigate/capture/manifest-v1.schema.json`
+- `tests/unit/test_manifest.py`
+- `tests/unit/test_fixture_server.py`
+- `fixtures/prompts/f1.txt`, `f2.txt`, `f3.txt`
+- `fixtures/workspace/` (`input.txt`, `buggy_stats.py`, `test_buggy_stats.py`, `README.md`)
+- `fixtures/fixture_server.py`
+- `data/work/.gitkeep`
 
 ## ARCHIVOS MODIFICADOS
 
-- `README.md` — estado, estructura, instalación, validaciones y uso de Makefile/pre-commit.
-- `pyproject.toml` — dependencias estáticas, extras de desarrollo, `packages.find`, pytest y Ruff.
-- `requirements.txt` — solo dependencias de ejecución y transitivas.
-- `.gitignore` — añadidos `data/interim/*` y `data/manifests/*` con excepción `.gitkeep`.
-- `src/aigate/__init__.py` — docstring y `__version__ = "0.1.0"`.
-- `docs/PROJECT_CONTEXT.md`, `docs/PROJECT_STATUS.md`, `docs/DECISIONS.md` — actualizados al estado final.
+- `docs/DECISIONS.md` — D-013…D-020 y resumen.
+- `docs/PROJECT_CONTEXT.md` — estado, estructura, decisiones y entorno.
+- `docs/PROJECT_STATUS.md` — componentes, validaciones y pendientes.
+- `docs/HANDOFF.md` — este documento.
+- `docs/CONFIG.md` — puntero a la Entrega 3.
+- `README.md` — estado de la Entrega 3 y documento de captura.
+- `pyproject.toml` — `package-data` para el esquema JSON.
+- `Makefile` y `.github/workflows/tests.yml` — lint/format también sobre `scripts` y `fixtures`.
+- `.gitignore` — `data/work/` ignorado salvo `.gitkeep`.
 
-No se ha modificado `tests/__init__.py` ni se han eliminado archivos existentes.
+**No modificados:** `docs/DATASET_CARD.md` no existe; `src/` solo cambia en `capture/`; `data/` sigue sin datos.
 
-## TESTS EJECUTADOS
+## COMPROBACIONES EJECUTADAS
 
 ```bash
 cd /home/kali/Opencode/repos/aigate
 source .venv/bin/activate
-
-python --version
-python -m pip check
-python -m pip show aigate
-python -c "import setuptools, aigate; ..."
-python -m pytest
-ruff check src tests
-ruff format --check src tests
 make check
-pre-commit run --files ...
-pre-commit install
-zeek --version
+bash -n scripts/lab_session.sh
+bash -n scripts/capture_session.sh
+DRY_RUN=1 ./scripts/lab_session.sh up s01 1
+DRY_RUN=1 ./scripts/capture_session.sh --lab-id s01 --agent openai \
+    --family F2 --repetition 1 --prompt fixtures/prompts/f2.txt -- echo hello
+codex --version
+claude --version
+opencode --version
 ```
-
-También se validaron `tcpdump`, `tshark`, `nft`, `ip`, `git` y el kernel, y se parsearon `.pre-commit-config.yaml` y `.github/workflows/tests.yml` con PyYAML.
-
-## RESULTADOS
 
 | Comprobación | Resultado |
 |---|---|
-| Python | 3.14.8 |
-| `pip check` | `No broken requirements found.` |
-| `pip show aigate` | `aigate 0.1.0`, editable en `src/aigate` |
-| `setuptools` | 84.2.1 |
-| Imports | `aigate` y los cinco subpaquetes importan |
-| `pytest` | `10 passed`, exit code 0 |
-| `ruff check src tests` | `All checks passed!` |
-| `ruff format --check src tests` | `9 files already formatted` |
-| `make check` | lint + formato + `10 passed`, exit code 0 |
-| Simulación de CI en venv limpio | `pip check`, `10 passed`, Ruff correcto; entorno temporal eliminado |
-| `pre-commit run --files ...` | Todos los hooks pasan |
-| `pre-commit install` | Hook instalado en `.git/hooks/pre-commit` |
-| Zeek | `zeek version 9.0.1` |
-| tcpdump | 4.99.6 |
-| tshark | 4.6.6 |
-| nftables | 1.1.7 |
-| iproute2 | 7.2.0 |
-| Git | 2.53.0 |
-| Kernel | 7.1.5+kali-amd64 |
+| `make check` | Ruff correcto, `25 passed` |
+| Sintaxis de los scripts | Correcta |
+| `DRY_RUN` | Previsualiza sin crear estado |
+| Codex | `0.170.0`, `gpt-6.2-sol` |
+| Claude Code | `2.1.327`, `Claude Opus 5.5` |
+| OpenCode | `2.1.4` |
+| `ip_forward` tras el piloto | `0` |
+| Namespace / veth / tabla tras el piloto | Eliminados |
 
-## PROBLEMAS CONOCIDOS
+## BLOQUEOS
 
-3. **Sin funcionalidad de producto.** Los subpaquetes son importables, pero no implementan captura, features, modelo, política ni enforcement.
-4. **`config/` y `scripts/` vacíos.** Se completarán en entregas posteriores.
-5. **Sin datos, manifiestos, modelo ni dashboard.** La Entrega 3 aún no ha comenzado.
-6. **`data/interim/` y `data/manifests/` preparados pero vacíos.** Correcto para esta fase.
+| # | Bloqueo | Necesita |
+|---|---|---|
+| B-01 | El piloto real de 3 sesiones no se ha ejecutado. | Ejecución manual con `sudo`, autenticación de clientes y captura. |
+| B-02 | ISCXVPN2016 exige un formulario con datos personales. | El usuario lo completa; el proyecto no lo automatiza. |
+| B-03 | No hay commit de 3.1/3.2. | Commit manual del usuario tras revisar `make check`. |
 
-No quedan bloqueos de configuración de la Entrega 2.
+Los bloqueos económicos anteriores están resueltos: el usuario confirmó el uso sin límites de los tres clientes.
 
-## DECISIONES PENDIENTES
+## DECISIONES ACEPTADAS
 
-- Definir el esquema de manifiestos en la Entrega 3.
-- Valorar patrones adicionales para `*.joblib`, `*.pkl`, `reports/` y `artifacts/` cuando existan.
-- Valorar hashes de integridad si el proyecto crece.
-- Implementar el producto en las siguientes entregas.
+| ID | Decisión |
+|---|---|
+| D-013 | Codex CLI, Claude Code y OpenCode/DeepSeek; uso confirmado. |
+| D-014 | Un netns + veth por sesión; captura en el extremo host. |
+| D-015 | DNS público por namespace; IPv6 desactivado dentro del ns. |
+| D-016 | 27 sesiones + 7 controles; etiqueta `CLIENT_RUNTIME_IDLE`. |
+| D-017 | Etiquetado de sesión y flujo; MCP del agente = `AGENT_TOOL_MCP`. |
+| D-018 | Manifiesto YAML v1 validado con JSON Schema y `jsonschema`. |
+| D-019 | ISCXVPN2016 Non-VPN como dataset externo de referencia. |
+| D-020 | PCAP privado; solo agregados y manifiestos saneados. |
 
-## SIGUIENTE ENTREGA
+## SIGUIENTE PASO
 
-**Entrega 3 — Dataset y exploración de datos**, solo después de que el usuario apruebe el cierre de la Entrega 2.
-
-Incluirá:
-
-- Selección de clientes de OpenAI, Claude Code y DeepSeek.
-- Verificación de documentación oficial, autenticación y costes.
-- Network namespaces y veth para aislar cada agente.
-- Captura por agente con tcpdump/Zeek.
-- Escenarios comparables y controles negativos.
-- Manifiestos y etiquetado reproducible.
-- Organización del dataset y exploración estadística.
-- Análisis de calidad, contaminaciones y limitaciones.
-- Dataset Card.
+1. Revisar y commitear los cambios de 3.1/3.2 (usuario).
+2. Autenticar los clientes fuera de la captura.
+3. Crear el laboratorio con `sudo ./scripts/lab_session.sh up s01 1`.
+4. Ejecutar 3 sesiones de piloto (una por agente, familia F2) con `capture_session.sh`.
+5. Revisar los manifiestos y los hosts observados; congelar `labelling_rules_version = 1`.
+6. Solicitar ISCXVPN2016 Non-VPN y preparar la muestra acotada.
+7. Actualizar `DATA_CAPTURE.md` con los hallazgos del piloto.
 
 ## PRIMERA ACCIÓN RECOMENDADA
 
-1. Revisar `git status --short` y `git diff`.
-2. Ejecutar `make check` y confirmar `10 passed`.
-3. Añadir los archivos al índice y ejecutar `pre-commit run --all-files`; el hook también se ejecutará en el commit.
-6. Solicitar aprobación para comenzar la Entrega 3.
+```bash
+cd /home/kali/Opencode/repos/aigate
+git status --short --branch
+source .venv/bin/activate
+make check
+DRY_RUN=1 ./scripts/lab_session.sh up s01 1
+DRY_RUN=1 ./scripts/capture_session.sh --lab-id s01 --agent openai \
+    --family F2 --repetition 1 --prompt fixtures/prompts/f2.txt -- echo hello
+```
+
+Después, revisar `docs/DATA_CAPTURE.md` §15 y ejecutar el piloto con `sudo`.
 
 ---
 
 ## Recuperación del entorno
 
-### 1. Entrar en el repositorio y en la rama
+### 1. Repositorio y rama
 
 ```bash
 cd /home/kali/Opencode/repos/aigate
-git switch entrega-2-entorno-y-estructura
-git branch --show-current
+git switch entrega-3-recogida-de-datos
+git status --short --branch
+git log --oneline -3
 ```
 
-Resultado esperado: `entrega-2-entorno-y-estructura`.
+Base esperada: `3ae9f4f`.
 
-### 2. Activar el entorno virtual existente
+### 2. Entorno virtual
 
 ```bash
 source .venv/bin/activate
-python --version
+python --version          # 3.14.8
+python -m pip check       # No broken requirements found.
 ```
 
-Resultado esperado: `Python 3.14.8`.
-
-### 3. Comprobar dependencias, paquete y herramientas
+### 3. Calidad
 
 ```bash
-python -m pip check
-python -m pip show aigate
-python -c "import setuptools, aigate; print(setuptools.__version__, aigate.__version__)"
-ruff --version
-pytest --version
-pre-commit --version
-zeek --version
+make check                # Ruff + formato + 25 tests
 ```
 
-Resultados esperados:
-
-- `No broken requirements found.`
-- `aigate 0.1.0` editable.
-- `84.2.1 0.1.0`.
-- Ruff 0.17.5.
-- pytest 9.2.0.
-- pre-commit 4.7.0.
-- Zeek 9.0.1.
-
-### 4. Ejecutar las comprobaciones de calidad
+### 4. Clientes
 
 ```bash
-make check
+codex --version           # 0.170.0
+claude --version          # 2.1.327
+opencode --version        # 2.1.4
 ```
 
-Resultado esperado: `All checks passed!`, `9 files already formatted`, `10 passed`.
-
-### 5. Ejecutar pre-commit
+### 5. Laboratorio limpio
 
 ```bash
-pre-commit run --all-files
+ip netns list
+sysctl net.ipv4.ip_forward
+ip -br link | grep veth || echo "sin veth"
+sudo nft list tables
+pgrep -af 'codex|claude|opencode' || echo "sin clientes en ejecución"
 ```
 
-Nota: `--all-files` solo considera archivos trackeados por Git. Para comprobar archivos nuevos antes de añadirlos al índice, usar `pre-commit run --files <rutas>`.
+Esperado: sin netns, `0`, sin veth, sin tabla `aigate_lab`, sin procesos.
 
-### 6. Recrear el entorno si `.venv` no existe
-
-Solo si es necesario y con acceso a red para instalar las dependencias fijadas:
+### 6. Script de laboratorio
 
 ```bash
-cd /home/kali/Opencode/repos/aigate
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install -r requirements-dev.txt
-python -m pip install -e .
-python -m pip check
-pre-commit install
-make check
+./scripts/lab_session.sh --help
+DRY_RUN=1 ./scripts/lab_session.sh up s01 1
+sudo ./scripts/lab_session.sh up s01 1
+sudo ./scripts/lab_session.sh status s01
+sudo ./scripts/lab_session.sh down s01
 ```
 
-Notas:
+`down` se niega a borrar un namespace con procesos vivos; usar `--force` solo si se ha comprobado que son los del experimento.
 
-- `requirements-dev.txt` incluye runtime, pytest, Ruff, pre-commit y setuptools.
-- `pip install -e .` instala el paquete en modo editable.
-- No se deben cambiar versiones ni añadir dependencias sin justificarlo y aprobarlo.
+---
 
-### 7. Comprobar Zeek
+## Reglas para no romper el estado
 
-```bash
-zeek --version
-dpkg-query -W -f='${Package} ${Version} ${Status}\n' zeek
-apt-cache policy zeek
-```
-
-Resultado esperado: `zeek 9.0.1-0 install ok installed`. `apt-cache policy` muestra el candidato `9.0.1-0` desde `security:/zeek/Debian_Testing` y el paquete de Kali `5.1.1-0kali3`. No reinstalar ni cambiar de repositorio sin revisar la compatibilidad con glibc.
+- No leer ni copiar ficheros de credenciales.
+- No publicar PCAP, logs crudos ni datos personales.
+- No dejar `ip_forward=1` ni la tabla `inet aigate_lab`.
+- No reducir las 27 sesiones sin aprobación y sin registrarlo.
+- No crear `DATASET_CARD.md` antes de tener datos reales.
+- No registrar en `DECISIONS.md` nada que no esté aprobado.
+- No mezclar `data/external/` con `data/raw/`.

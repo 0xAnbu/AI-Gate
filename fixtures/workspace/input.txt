@@ -1,0 +1,39 @@
+# Notas de la revisión trimestral de infraestructura
+
+Documento de trabajo del equipo de infraestructura. No contiene datos personales.
+
+## Estado de la plataforma
+
+La plataforma interna cerró el trimestre con una disponibilidad del 99,4 %. Los dos
+incidentes registrados se debieron a una configuración incorrecta del proxy de salida
+y a un disco lleno en el nodo de registro. Ninguno de los dos afectó a datos de
+clientes. El tiempo medio de recuperación fue de 47 minutos.
+
+## Capacidad
+
+El uso medio de CPU se mantuvo en el 38 % y el de memoria en el 61 %. El crecimiento
+de almacenamiento fue del 12 % respecto al trimestre anterior. Con ese ritmo, la
+capacidad libre actual alcanza para unos siete meses. Se propone revisar la política
+de retención de logs antes de ampliar el clúster.
+
+## Red
+
+La migración al nuevo cortafuegos terminó en el segundo mes. Se redujeron las reglas
+de 412 a 176 y se eliminaron treinta y una reglas duplicadas. El equipo detectó que
+tres servicios seguían usando un rango antiguo y se actualizaron sus inventarios.
+Las pruebas de latencia no mostraron diferencias significativas.
+
+## Automatización
+
+El pipeline de integración pasó de 18 a 11 minutos gracias a la caché de dependencias.
+Se añadieron comprobaciones de formato y de enlaces rotos en la documentación. La
+cobertura de pruebas se mantuvo estable. El siguiente objetivo es automatizar la
+rotación de certificados internos.
+
+## Riesgos y siguientes pasos
+
+El riesgo principal es la dependencia de una sola persona para las tareas de
+certificados. También preocupa la falta de un inventario único de servicios. Para el
+próximo trimestre se acordó documentar el procedimiento de rotación, crear una lista
+compartida de servicios y repetir el ejercicio de carga con el doble de usuarios
+simulados. No se aprobaron compras de hardware en esta reunión.

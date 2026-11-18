@@ -4,9 +4,9 @@
 
 > Documento persistente de contexto. Debe permitir retomar el proyecto sin depender del historial de conversaciones.
 >
-> Última actualización: 2026-11-15
-> Entrega en curso: 2 — Preparación del entorno y estructura del proyecto.
-> Estado: cerrada técnicamente; commit pendiente de ejecución humana.
+> Última actualización: 2026-11-18
+> Entrega en curso: 3 — Dataset y exploración de datos.
+> Estado: 3.1 aprobada; 3.2 (laboratorio y piloto) en curso. Clientes instalados, esquema de manifiesto y script de laboratorio implementados; captura del dataset **no iniciada**.
 
 ---
 
@@ -80,16 +80,17 @@ AGENTE / HUMANO / AUTOMATIZACIÓN
 
 | Componente | Responsabilidad | Estado actual |
 |---|---|---|
-| `capture/` | Captura PCAP/PCAPNG, simulación desde PCAP y orquestación de Zeek. | Paquete importable con `__init__.py`; sin implementación. |
+| `capture/` | Captura PCAP/PCAPNG, simulación desde PCAP y orquestación de Zeek. | `manifest.py` y `manifest-v1.schema.json` implementados y testeados; captura pendiente. |
 | `features/` | Parseo de registros Zeek, agregación temporal y cálculo de variables. | Paquete importable con `__init__.py`; sin implementación. |
 | `models/` | Entrenamiento, evaluación, carga y serialización de modelos. | Paquete importable con `__init__.py`; sin implementación. |
 | `policy/` | Whitelist, blacklist, reglas deterministas, umbrales y decisiones explicables. | Paquete importable con `__init__.py`; sin implementación. |
 | `enforcement/` | Traducción de decisiones a nftables y gestión de namespaces. | Paquete importable con `__init__.py`; sin implementación. |
 | `config/` | Configuración YAML del gateway y de las políticas. | Directorio vacío. |
-| `data/` | Capturas originales, datos derivados, datasets externos, datos intermedios y manifiestos. | Directorios y `.gitkeep`; sin datos. |
+| `data/` | Capturas originales, datos derivados, datasets externos, datos intermedios, manifiestos y workspaces de sesión. | Directorios y `.gitkeep`; sin datos. Esquema de manifiesto v1 implementado en `capture/`. |
 | `models/` (raíz) | Artefactos serializados. | Solo `.gitkeep`. |
-| `scripts/` | Automatización de laboratorio y escenarios. | Directorio vacío. |
-| `tests/` | Tests unitarios, de integración, de pipeline, de políticas y de firewall. | 10 tests de infraestructura en `tests/unit/`; resto pendiente. |
+| `scripts/` | Automatización de laboratorio y escenarios. | `lab_session.sh` y `capture_session.sh` operativos en modo seco; captura real pendiente. |
+| `fixtures/` | Prompts, workspace inicial y servidor local de F3. | Implementado y con 3 tests del servidor. |
+| `tests/` | Tests unitarios, de integración, de pipeline, de políticas y de firewall. | 25 tests: 10 de infraestructura, 12 del manifiesto y 3 del fixture local. |
 | Dashboard Streamlit | Monitorización de resultados. | No iniciado. |
 
 ### 3.2. Invariantes de diseño
@@ -136,26 +137,39 @@ aigate/
 │   ├── processed/.gitkeep      # datos derivados; ignorados por Git
 │   ├── external/.gitkeep       # datasets de terceros; ignorados por Git
 │   ├── interim/.gitkeep        # datos intermedios; ignorados por Git
-│   └── manifests/.gitkeep      # manifiestos; ignorados por Git
+│   ├── manifests/.gitkeep      # manifiestos; ignorados por Git
+│   └── work/.gitkeep           # copia por sesión del workspace; ignorada por Git
 ├── docs/
 │   ├── PROJECT_CONTEXT.md
 │   ├── PROJECT_STATUS.md
 │   ├── DECISIONS.md
+│   ├── DATA_CAPTURE.md         # diseño experimental y estado de 3.2
 │   └── HANDOFF.md
+├── fixtures/
+│   ├── prompts/                # f1.txt, f2.txt, f3.txt
+│   ├── workspace/              # estado inicial común de F1/F2
+│   └── fixture_server.py       # servicio HTTP local para F3
 ├── models/.gitkeep             # artefactos; ignorados por Git
-├── scripts/                    # vacío
+├── scripts/
+│   ├── lab_session.sh          # laboratorio aislado: up/down/status/exec
+│   ├── capture_session.sh      # captura, límites, hashes y manifiesto
+│   └── _write_capture_manifest.py
 ├── src/aigate/
 │   ├── __init__.py             # versión del paquete
-│   ├── capture/__init__.py     # docstring; sin implementación
-│   ├── features/__init__.py    # docstring; sin implementación
-│   ├── models/__init__.py      # docstring; sin implementación
-│   ├── policy/__init__.py      # docstring; sin implementación
-│   └── enforcement/__init__.py # docstring; sin implementación
+│   ├── capture/
+│   │   ├── __init__.py         # docstring
+│   │   ├── manifest.py         # carga y validación de manifiestos
+│   │   └── manifest-v1.schema.json
+│   ├── features/__init__.py     # docstring; sin implementación
+│   ├── models/__init__.py       # docstring; sin implementación
+│   ├── policy/__init__.py       # docstring; sin implementación
+│   └── enforcement/__init__.py  # docstring; sin implementación
 ├── tests/
 │   ├── __init__.py
 │   └── unit/
 │       ├── __init__.py
-│       └── test_infrastructure.py
+│       ├── test_infrastructure.py
+│       └── test_manifest.py
 ├── .github/workflows/tests.yml
 ├── .gitignore
 ├── .pre-commit-config.yaml
@@ -201,8 +215,24 @@ Comprobado el 2026-11-15:
 - La instalación desde `requirements-dev.txt` + `pip install -e .` se validó en un venv limpio temporal: `pip check`, 10 tests y Ruff pasaron.
 - `zeek --version` → `zeek version 9.0.1`.
 - Zeek instalado desde `https://download.opensuse.org/repositories/security:/zeek/Debian_Testing`; el paquete de Kali `5.1.1-0kali3` no se usa por incompatibilidad con glibc.
-- No hay commits nuevos. El trabajo está en la rama `entrega-2-entorno-y-estructura`, con cambios sin commitear; el commit corresponde al usuario.
-- La CI está configurada, pero no se ha ejecutado en GitHub porque no se ha hecho push.
+- La rama de trabajo actual es `entrega-3-recogida-de-datos`, creada desde `main`; el árbol está limpio en `3ae9f4f Merge PR: entrega-2-entorno-y-estructura`. No hay commits nuevos ni push.
+- La CI está configurada; se ejecutará en GitHub cuando el usuario haga push.
+
+Comprobado el 2026-11-18 (Entrega 3, diseño y preparación del laboratorio):
+
+- `opencode --version` → `2.1.4`, instalado en `/usr/bin/opencode`.
+- `codex --version` → `0.170.0`; modelo reportado `gpt-6.2-sol`.
+- `claude --version` → `2.1.327`; modelo reportado `Claude Opus 5.5` (`claude-opus-5-5`).
+- Node.js y npm no están instalados; ninguno de los tres clientes los necesita.
+- `bwrap`, `socat`, `jq`, `unshare` y `nsenter` están disponibles.
+- `net.ipv4.ip_forward = 0` y `net.ipv6.conf.all.forwarding = 0`; no hay ningún network namespace activo.
+- `jsonschema 4.26.0` está en `.venv` como dependencia transitiva fijada; se usa para validar manifiestos sin añadir paquetes.
+- El piloto de conectividad creó `aigate-s01`, capturó 32 paquetes en `veth-h-s01` y obtuvo `401` de `api.deepseek.com`; la limpieza restauró `ip_forward=0` y eliminó namespace, veth y tabla nftables.
+- `~/.codex` y `~/.claude` existen tras la instalación. **No se han leído ni copiado sus credenciales.**
+- `scripts/lab_session.sh` implementa creación, verificación y limpieza con `trap`; no se ha ejecutado con `sudo` desde esta sesión.
+- `scripts/capture_session.sh` implementa tcpdump, límites de duración/inactividad/tamaño, hashes, `capture.meta.json` y manifiesto; validado en seco, no ejecutado con `sudo`.
+- `fixtures/prompts/{f1,f2,f3}.txt`, `fixtures/workspace/` y `fixtures/fixture_server.py` están implementados; el servidor tiene 3 tests en `tests/unit/test_fixture_server.py`.
+- El diseño completo, las decisiones D-013…D-020 y el estado de 3.2 están en `docs/DATA_CAPTURE.md` y `docs/DECISIONS.md`.
 
 ## 8. Estado documental
 
@@ -210,10 +240,13 @@ La Entrega 1 se completó según el prompt maestro, pero sus artefactos no está
 
 La Entrega 2 deja creados `PROJECT_CONTEXT.md`, `PROJECT_STATUS.md`, `DECISIONS.md` y `HANDOFF.md`, y actualiza `README.md`. También incorpora `Makefile`, `.pre-commit-config.yaml`, `.github/workflows/tests.yml`, `requirements-dev.txt` y los tests de infraestructura. Los documentos de entregas posteriores (`PROJECT_SPEC.md`, `ARCHITECTURE.md`, `DATASET_CARD.md`, `MODEL_CARD.md`, `TEST_PLAN.md`, `DEMO_RUNBOOK.md`) se crearán cuando exista contenido real que documentar.
 
+La sub-entrega 3.1 añade `DATA_CAPTURE.md`, que contiene el diseño experimental completo y **no** datos. El 2026-11-18 el usuario aprobó las propuestas P-01…P-08 y P-10, rechazó P-09 y seleccionó ISCXVPN2016 Non-VPN; esas decisiones están registradas como D-013…D-020 en `DECISIONS.md`. `DATASET_CARD.md` no se crea hasta que existan capturas reales.
+
 ## 9. Documentos relacionados
 
 - `docs/PROJECT_STATUS.md` — estado por componente, validaciones y pendientes.
 - `docs/DECISIONS.md` — decisiones arquitectónicas y explicación aplicada.
+- `docs/DATA_CAPTURE.md` — diseño experimental del dataset (Entrega 3): clientes, costes, aislamiento, captura, escenarios, etiquetado, manifiestos y riesgos.
 - `docs/HANDOFF.md` — reanudación y recuperación del entorno.
 - `README.md` — presentación, estructura, instalación y estado.
 - `context/MASTER-PROMPT.md` — prompt maestro del proyecto.
